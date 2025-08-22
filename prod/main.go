@@ -44,7 +44,7 @@ func main() {
 
 func createTestOrder() models.Order {
 	return models.Order{
-		OrderUID:    "b563feb7b2b84b6test",
+		OrderUID:    "a563feb7b2b84b6test",
 		TrackNumber: "WBILMTESTTRACK",
 		Entry:       "WBIL",
 		Delivery: models.Delivery{

@@ -22,3 +22,10 @@ func (cache *Cache) Set(order models.Order) {
 	defer cache.mu.Unlock()
 	cache.orders[order.OrderUID] = order
 }
+
+func (cache *Cache) Get(orderUID string) (models.Order, bool) {
+	cache.mu.RLock()
+	defer cache.mu.RUnlock()
+	order, exists := cache.orders[orderUID]
+	return order, exists
+}

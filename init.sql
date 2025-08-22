@@ -1,5 +1,3 @@
-CREATE DATABASE orders_db;
-
 CREATE TABLE IF NOT EXISTS orders (
     order_uid TEXT PRIMARY KEY,
     track_number TEXT,
@@ -16,7 +14,7 @@ CREATE TABLE IF NOT EXISTS orders (
 
 CREATE TABLE IF NOT EXISTS delivery (
     id SERIAL PRIMARY KEY,
-    order_uid TEXT
+    order_uid TEXT,
     name TEXT,
     phone TEXT,
     zip TEXT,
@@ -27,7 +25,7 @@ CREATE TABLE IF NOT EXISTS delivery (
 );
 
 CREATE TABLE IF NOT EXISTS payment (
-    order_uid TEXT PRIMARY KEY 
+    order_uid TEXT PRIMARY KEY,
     transaction TEXT,
     request_id TEXT,
     currency TEXT,
@@ -42,7 +40,7 @@ CREATE TABLE IF NOT EXISTS payment (
 
 CREATE TABLE IF NOT EXISTS items (
     id SERIAL PRIMARY KEY,
-    order_uid TEXT 
+    order_uid TEXT,
     chrt_id INTEGER,
     track_number TEXT,
     price INTEGER,
@@ -52,6 +50,6 @@ CREATE TABLE IF NOT EXISTS items (
     size TEXT,
     total_price INTEGER,
     nm_id INTEGER,
-    brand TEXT`,
+    brand TEXT,
     status INTEGER
 );

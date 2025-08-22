@@ -13,9 +13,25 @@ import (
 	"github.com/segmentio/kafka-go"
 )
 
+func loadCacheFromDB(db *sql.DB, cache *cache.Cache) error {
+	tempCache := make(map[string]models.Order)
+
+	err := database.LoadRecentOrdersFromDB(db, tempCache)
+	if err != nil {
+		return err
+	} else {
+		log.Printf("cache loaded")
+	}
+
+	for _, order := range tempCache {
+		cache.Set(order)
+	}
+
+	return nil
+}
 func main() {
 	topic := "orders"
-	broker := "localhost:9092"
+	broker := "kafka:29092"
 	groupID := "order-consumers"
 
 	r := kafka.NewReader(kafka.ReaderConfig{
@@ -35,6 +51,12 @@ func main() {
 
 	defer db.Close()
 
+	err = loadCacheFromDB(db, cache)
+
+	if err != nil {
+		log.Print("error load cache from db", err)
+	}
+
 	for {
 		message, err := r.ReadMessage(context.Background())
 		if err != nil {
@@ -48,10 +70,12 @@ func main() {
 		}
 
 		cache.Set(order)
+		log.Printf("data in map")
 		err = database.SaveOrder(db, order)
 		if err != nil {
 			log.Printf("save order error: %v, %v", order.OrderUID, err)
 			continue
 		}
+		log.Printf("data in db")
 	}
 }
