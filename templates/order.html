@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html>
+<head>
+</head>
+<body>
+    <h1>Order: {{.OrderUID}}</h1>
+    
+    <h2>Basic Information</h2>
+    <table>
+        <tr><th>Field</th><th>Value</th></tr>
+        <tr><td>Order UID</td><td>{{.OrderUID}}</td></tr>
+        <tr><td>Track Number</td><td>{{.TrackNumber}}</td></tr>
+        <tr><td>Entry</td><td>{{.Entry}}</td></tr>
+        <tr><td>Locale</td><td>{{.Locale}}</td></tr>
+        <tr><td>Customer ID</td><td>{{.CustomerID}}</td></tr>
+        <tr><td>Delivery Service</td><td>{{.DeliveryService}}</td></tr>
+        <tr><td>Shardkey</td><td>{{.ShardKey}}</td></tr>
+        <tr><td>SM ID</td><td>{{.SMID}}</td></tr>
+        <tr><td>Date Created</td><td>{{.DateCreated}}</td></tr>
+        <tr><td>OOF Shard</td><td>{{.OOFShard}}</td></tr>
+    </table>
+
+    <h2>Delivery Information</h2>
+    <table>
+        <tr><th>Field</th><th>Value</th></tr>
+        <tr><td>Name</td><td>{{.Delivery.Name}}</td></tr>
+        <tr><td>Phone</td><td>{{.Delivery.Phone}}</td></tr>
+        <tr><td>Zip</td><td>{{.Delivery.Zip}}</td></tr>
+        <tr><td>City</td><td>{{.Delivery.City}}</td></tr>
+        <tr><td>Address</td><td>{{.Delivery.Address}}</td></tr>
+        <tr><td>Region</td><td>{{.Delivery.Region}}</td></tr>
+        <tr><td>Email</td><td>{{.Delivery.Email}}</td></tr>
+    </table>
+
+    <h2>Payment Information</h2>
+    <table>
+        <tr><th>Field</th><th>Value</th></tr>
+        <tr><td>Transaction</td><td>{{.Payment.Transaction}}</td></tr>
+        <tr><td>Request ID</td><td>{{.Payment.RequestID}}</td></tr>
+        <tr><td>Currency</td><td>{{.Payment.Currency}}</td></tr>
+        <tr><td>Provider</td><td>{{.Payment.Provider}}</td></tr>
+        <tr><td>Amount</td><td>{{.Payment.Amount}}</td></tr>
+        <tr><td>Payment Dt</td><td>{{.Payment.PaymentDt}}</td></tr>
+        <tr><td>Bank</td><td>{{.Payment.Bank}}</td></tr>
+        <tr><td>Delivery Cost</td><td>{{.Payment.DeliveryCost}}</td></tr>
+        <tr><td>Goods Total</td><td>{{.Payment.GoodsTotal}}</td></tr>
+        <tr><td>Custom Fee</td><td>{{.Payment.CustomFee}}</td></tr>
+    </table>
+
+    <h2>Items</h2>
+    {{if .Items}}
+    <table>
+        <tr>
+            <th>Chrt ID</th><th>Name</th><th>Price</th><th>Sale</th>
+            <th>Total Price</th><th>Brand</th><th>Status</th>
+        </tr>
+        {{range .Items}}
+        <tr>
+            <td>{{.ChrtID}}</td>
+            <td>{{.Name}}</td>
+            <td>{{.Price}}</td>
+            <td>{{.Sale}}</td>
+            <td>{{.TotalPrice}}</td>
+            <td>{{.Brand}}</td>
+            <td>{{.Status}}</td>
+        </tr>
+        {{end}}
+    </table>
+    {{else}}
+    <p>No items</p>
+    {{end}}
+
+    <div class="back-link">
+        <a href="/">← Back to search</a>
+    </div>
+</body>
+</html>

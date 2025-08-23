@@ -5,10 +5,9 @@ WORKDIR /app
 COPY go.mod go.sum ./
 RUN go mod download
 
-COPY cons/ ./cons/
-COPY cache/ ./cache/
-COPY models/ ./models/
-COPY storage/ ./storage/
+COPY . .
+
+COPY .env .env
 
 RUN go build -o consumer ./cons
 

@@ -4,10 +4,11 @@ import (
 	"database/sql"
 	"log"
 
+	"github.com/ArtemKVD/WB-TechL0/logger"
 	"github.com/ArtemKVD/WB-TechL0/models"
 )
 
-func LoadRecentOrdersFromDB(db *sql.DB, cache map[string]models.Order) error {
+func LoadOrdersFromDB(db *sql.DB, cache map[string]models.Order) error {
 	limit := 5
 	tx, err := db.Begin()
 	if err != nil {
@@ -40,7 +41,6 @@ func LoadRecentOrdersFromDB(db *sql.DB, cache map[string]models.Order) error {
 
 	rows, err := tx.Query(query, limit)
 	if err != nil {
-		log.Print("Query error")
 		return err
 	}
 	defer rows.Close()
@@ -55,7 +55,7 @@ func LoadRecentOrdersFromDB(db *sql.DB, cache map[string]models.Order) error {
 			&bank, &deliveryCost, &goodsTotal, &customFee, &chrtID, &itemTrackNumber, &price, &rid, &itemName, &sale, &size, &totalPrice, &nmID, &brand, &status,
 		)
 		if err != nil {
-			log.Printf("Error scanning row: %v", err)
+			logger.Log.Error("Error scanning row ", err)
 			continue
 		}
 
@@ -118,15 +118,12 @@ func LoadRecentOrdersFromDB(db *sql.DB, cache map[string]models.Order) error {
 		cache[orderUID] = order
 	}
 
-	if err = rows.Err(); err != nil {
+	err = tx.Commit()
+	if err != nil {
+		logger.Log.Error("transaction commit error", err)
 		return err
 	}
 
-	if err = tx.Commit(); err != nil {
-		log.Print("transaction commit error")
-		return err
-	}
-
-	log.Print("orders load in cache")
+	logger.Log.Info("orders load in cache")
 	return nil
 }

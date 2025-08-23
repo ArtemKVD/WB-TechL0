@@ -3,15 +3,17 @@ package main
 import (
 	"context"
 	"encoding/json"
-	"log"
 
+	"github.com/ArtemKVD/WB-TechL0/config"
+	"github.com/ArtemKVD/WB-TechL0/logger"
 	models "github.com/ArtemKVD/WB-TechL0/models"
 
 	"github.com/segmentio/kafka-go"
 )
 
 func main() {
-	topic := "orders"
+	cfg := config.Load()
+	topic := cfg.Kafka.Topic
 	broker := "localhost:9092"
 
 	w := &kafka.Writer{
@@ -26,7 +28,7 @@ func main() {
 
 	SendOrder, err := json.Marshal(order)
 	if err != nil {
-		log.Printf("marshal order error: %v", err)
+		logger.Log.Error("marshal order error ", err)
 	}
 
 	err = w.WriteMessages(context.Background(),
@@ -36,10 +38,10 @@ func main() {
 	)
 
 	if err != nil {
-		log.Printf("write message error: %v", err)
+		logger.Log.Error("write message error ", err)
 	}
 
-	log.Printf("order sent")
+	logger.Log.Info("order write")
 }
 
 func createTestOrder() models.Order {

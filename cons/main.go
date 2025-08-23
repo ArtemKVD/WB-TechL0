@@ -4,23 +4,27 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
-	"log"
 
+	"github.com/ArtemKVD/WB-TechL0/api"
 	"github.com/ArtemKVD/WB-TechL0/cache"
+	"github.com/ArtemKVD/WB-TechL0/config"
+	"github.com/ArtemKVD/WB-TechL0/logger"
 	"github.com/ArtemKVD/WB-TechL0/models"
 	database "github.com/ArtemKVD/WB-TechL0/storage"
+	"github.com/gin-gonic/gin"
 	_ "github.com/lib/pq"
 	"github.com/segmentio/kafka-go"
+	"github.com/sirupsen/logrus"
 )
 
 func loadCacheFromDB(db *sql.DB, cache *cache.Cache) error {
 	tempCache := make(map[string]models.Order)
 
-	err := database.LoadRecentOrdersFromDB(db, tempCache)
+	err := database.LoadOrdersFromDB(db, tempCache)
 	if err != nil {
 		return err
 	} else {
-		log.Printf("cache loaded")
+		logger.Log.Info("Cache loaded")
 	}
 
 	for _, order := range tempCache {
@@ -29,10 +33,40 @@ func loadCacheFromDB(db *sql.DB, cache *cache.Cache) error {
 
 	return nil
 }
+
+func startHTTPServer(cache *cache.Cache, db *sql.DB, cfg config.HTTPConfig) {
+	router := gin.Default()
+	handler := api.NewHandler(cache, db)
+
+	router.LoadHTMLGlob("templates/*.html")
+
+	router.GET("/", func(c *gin.Context) {
+		c.File("./templates/index.html")
+	})
+
+	router.GET("/order", handler.GetOrder)
+
+	logger.Log.WithFields(logrus.Fields{
+		"port": cfg.Port,
+	}).Info("Starting HTTP server")
+
+	err := router.Run(":" + cfg.Port)
+	if err != nil {
+		logger.Log.WithFields(logrus.Fields{
+			"error": err.Error(),
+			"port":  cfg.Port,
+		}).Fatal("HTTP server failed to start")
+	}
+}
+
 func main() {
-	topic := "orders"
-	broker := "kafka:29092"
-	groupID := "order-consumers"
+	cfg := config.Load()
+	logger.Init()
+	logger.Log.Info("Consumer starting")
+
+	topic := cfg.Kafka.Topic
+	broker := cfg.Kafka.Broker
+	groupID := cfg.Kafka.GroupID
 
 	r := kafka.NewReader(kafka.ReaderConfig{
 		Brokers: []string{broker},
@@ -44,9 +78,9 @@ func main() {
 
 	cache := cache.NewCache()
 
-	db, err := sql.Open("postgres", database.GetConnString())
+	db, err := sql.Open("postgres", database.GetConnString(cfg.Database))
 	if err != nil {
-		log.Printf("db connection error: %v", err)
+		logger.Log.Fatal("error connect to db")
 	}
 
 	defer db.Close()
@@ -54,28 +88,29 @@ func main() {
 	err = loadCacheFromDB(db, cache)
 
 	if err != nil {
-		log.Print("error load cache from db", err)
+		logger.Log.Warn("error load cache from db", err)
 	}
+	go startHTTPServer(cache, db, cfg.HTTP)
 
 	for {
 		message, err := r.ReadMessage(context.Background())
 		if err != nil {
-			log.Fatalf("read message error: %v", err)
+			logger.Log.Error("Error read message from kafka", err)
 		}
 
 		var order models.Order
 		err = json.Unmarshal(message.Value, &order)
 		if err != nil {
-			log.Printf("unmarshal message error: %v", err)
+			logger.Log.Error("Unmarshal message error", err)
 		}
 
 		cache.Set(order)
-		log.Printf("data in map")
+		logger.Log.Info("Order saved in cache")
 		err = database.SaveOrder(db, order)
 		if err != nil {
-			log.Printf("save order error: %v, %v", order.OrderUID, err)
+			logger.Log.Error("save order error", err)
 			continue
 		}
-		log.Printf("data in db")
+		logger.Log.Info("Order saved in database")
 	}
 }
