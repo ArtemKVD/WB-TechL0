@@ -4,9 +4,9 @@ import (
 	"context"
 	"encoding/json"
 
-	"github.com/ArtemKVD/WB-TechL0/config"
-	"github.com/ArtemKVD/WB-TechL0/logger"
-	models "github.com/ArtemKVD/WB-TechL0/models"
+	"github.com/ArtemKVD/WB-TechL0/internal/config"
+	"github.com/ArtemKVD/WB-TechL0/internal/logger"
+	models "github.com/ArtemKVD/WB-TechL0/pkg/models"
 
 	"github.com/segmentio/kafka-go"
 )

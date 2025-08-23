@@ -9,6 +9,6 @@ COPY . .
 
 COPY .env .env
 
-RUN go build -o consumer ./cons
+RUN go build -o consumer ./cmd/cons
 
 CMD ["./consumer"]

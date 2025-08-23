@@ -2,11 +2,12 @@ package database
 
 import (
 	"database/sql"
+	"errors"
 	"fmt"
 
-	"github.com/ArtemKVD/WB-TechL0/config"
-	"github.com/ArtemKVD/WB-TechL0/logger"
-	"github.com/ArtemKVD/WB-TechL0/models"
+	"github.com/ArtemKVD/WB-TechL0/internal/config"
+	"github.com/ArtemKVD/WB-TechL0/internal/logger"
+	"github.com/ArtemKVD/WB-TechL0/pkg/models"
 	"github.com/joho/godotenv"
 )
 
@@ -129,8 +130,13 @@ func GetOrderFromDB(db *sql.DB, orderUID string) (models.Order, error) {
 			&chrtID, &itemTrackNumber, &price, &rid, &itemName,
 			&sale, &size, &totalPrice, &nmID, &brand, &status,
 		)
+		err = rows.Err()
 		if err != nil {
-			logger.Log.Error("Error scan row", err)
+			if errors.Is(err, sql.ErrNoRows) {
+				logger.Log.Error("Order not found ", err)
+				return models.Order{}, err
+			}
+			logger.Log.Error("Iterating rows error ", err)
 			return models.Order{}, err
 		}
 

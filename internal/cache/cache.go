@@ -3,8 +3,8 @@ package cache
 import (
 	"sync"
 
-	"github.com/ArtemKVD/WB-TechL0/logger"
-	"github.com/ArtemKVD/WB-TechL0/models"
+	"github.com/ArtemKVD/WB-TechL0/internal/logger"
+	"github.com/ArtemKVD/WB-TechL0/pkg/models"
 )
 
 type Cache struct {

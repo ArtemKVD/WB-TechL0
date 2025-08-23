@@ -2,11 +2,12 @@ package api
 
 import (
 	"database/sql"
+	"errors"
 	"net/http"
 
-	"github.com/ArtemKVD/WB-TechL0/cache"
-	"github.com/ArtemKVD/WB-TechL0/logger"
-	database "github.com/ArtemKVD/WB-TechL0/storage"
+	"github.com/ArtemKVD/WB-TechL0/internal/cache"
+	"github.com/ArtemKVD/WB-TechL0/internal/logger"
+	database "github.com/ArtemKVD/WB-TechL0/internal/storage"
 	"github.com/gin-gonic/gin"
 )
 
@@ -24,7 +25,7 @@ func NewHandler(cache *cache.Cache, db *sql.DB) *Handler {
 }
 
 func (h *Handler) IndexPage(c *gin.Context) {
-	c.File("./templates/index.html")
+	c.HTML(http.StatusOK, "index.html", gin.H{})
 }
 
 func (h *Handler) GetOrder(c *gin.Context) {
@@ -35,7 +36,7 @@ func (h *Handler) GetOrder(c *gin.Context) {
 		var err error
 		order, err = database.GetOrderFromDB(h.db, orderUID)
 		if err != nil {
-			if err == sql.ErrNoRows {
+			if errors.Is(err, sql.ErrNoRows) {
 				c.JSON(http.StatusNotFound, gin.H{"error": "Order not found"})
 			} else {
 				c.JSON(http.StatusInternalServerError, gin.H{"error": "Database error"})

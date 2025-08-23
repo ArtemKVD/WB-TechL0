@@ -2,17 +2,16 @@ package database
 
 import (
 	"database/sql"
-	"log"
 
-	"github.com/ArtemKVD/WB-TechL0/logger"
-	"github.com/ArtemKVD/WB-TechL0/models"
+	"github.com/ArtemKVD/WB-TechL0/internal/logger"
+	"github.com/ArtemKVD/WB-TechL0/pkg/models"
 )
 
 func LoadOrdersFromDB(db *sql.DB, cache map[string]models.Order) error {
 	limit := 5
 	tx, err := db.Begin()
 	if err != nil {
-		log.Print("begin transaction error")
+		logger.Log.Error("begin transaction error", err)
 		return err
 	}
 	defer tx.Rollback()

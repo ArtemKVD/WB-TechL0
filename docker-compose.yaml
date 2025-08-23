@@ -57,7 +57,7 @@ services:
   consumer:
     build:
       context: .
-      dockerfile: cons/Dockerfile
+      dockerfile: cmd/cons/Dockerfile
     depends_on:
       kafka:
         condition: service_healthy

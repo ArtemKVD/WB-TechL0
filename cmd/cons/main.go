@@ -5,12 +5,12 @@ import (
 	"database/sql"
 	"encoding/json"
 
-	"github.com/ArtemKVD/WB-TechL0/api"
-	"github.com/ArtemKVD/WB-TechL0/cache"
-	"github.com/ArtemKVD/WB-TechL0/config"
-	"github.com/ArtemKVD/WB-TechL0/logger"
-	"github.com/ArtemKVD/WB-TechL0/models"
-	database "github.com/ArtemKVD/WB-TechL0/storage"
+	"github.com/ArtemKVD/WB-TechL0/internal/api"
+	"github.com/ArtemKVD/WB-TechL0/internal/cache"
+	"github.com/ArtemKVD/WB-TechL0/internal/config"
+	"github.com/ArtemKVD/WB-TechL0/internal/logger"
+	database "github.com/ArtemKVD/WB-TechL0/internal/storage"
+	"github.com/ArtemKVD/WB-TechL0/pkg/models"
 	"github.com/gin-gonic/gin"
 	_ "github.com/lib/pq"
 	"github.com/segmentio/kafka-go"
@@ -38,11 +38,9 @@ func startHTTPServer(cache *cache.Cache, db *sql.DB, cfg config.HTTPConfig) {
 	router := gin.Default()
 	handler := api.NewHandler(cache, db)
 
-	router.LoadHTMLGlob("templates/*.html")
+	router.LoadHTMLGlob("web/templates/*.html")
 
-	router.GET("/", func(c *gin.Context) {
-		c.File("./templates/index.html")
-	})
+	router.GET("/", handler.IndexPage)
 
 	router.GET("/order", handler.GetOrder)
 
