@@ -28,15 +28,6 @@ services:
       timeout: 5s
       retries: 10
 
-  kafka-ui:
-    image: provectuslabs/kafka-ui
-    container_name: kafka-ui
-    ports:
-      - "8090:8080"
-    depends_on:
-      kafka:
-        condition: service_healthy
-
   postgres:
     image: postgres:17-alpine
     ports:
