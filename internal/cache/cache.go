@@ -1,9 +1,11 @@
 package cache
 
 import (
+	"database/sql"
 	"sync"
 
 	"github.com/ArtemKVD/WB-TechL0/internal/logger"
+	database "github.com/ArtemKVD/WB-TechL0/internal/storage"
 	"github.com/ArtemKVD/WB-TechL0/pkg/models"
 )
 
@@ -42,4 +44,21 @@ func (cache *Cache) Get(orderUID string) (models.Order, bool) {
 		).Info("Order not found in cache")
 	}
 	return order, exists
+}
+
+func (cache *Cache) LoadCacheFromDB(db *sql.DB) error {
+	tempCache := make(map[string]models.Order)
+
+	err := database.LoadOrdersFromDB(db, tempCache)
+	if err != nil {
+		return err
+	} else {
+		logger.Log.Info("Cache loaded")
+	}
+
+	for _, order := range tempCache {
+		cache.Set(order)
+	}
+
+	return nil
 }

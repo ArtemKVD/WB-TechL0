@@ -5,57 +5,15 @@ import (
 	"database/sql"
 	"encoding/json"
 
-	"github.com/ArtemKVD/WB-TechL0/internal/api"
 	"github.com/ArtemKVD/WB-TechL0/internal/cache"
 	"github.com/ArtemKVD/WB-TechL0/internal/config"
 	"github.com/ArtemKVD/WB-TechL0/internal/logger"
+	"github.com/ArtemKVD/WB-TechL0/internal/server"
 	database "github.com/ArtemKVD/WB-TechL0/internal/storage"
 	"github.com/ArtemKVD/WB-TechL0/pkg/models"
-	"github.com/gin-gonic/gin"
 	_ "github.com/lib/pq"
 	"github.com/segmentio/kafka-go"
-	"github.com/sirupsen/logrus"
 )
-
-func loadCacheFromDB(db *sql.DB, cache *cache.Cache) error {
-	tempCache := make(map[string]models.Order)
-
-	err := database.LoadOrdersFromDB(db, tempCache)
-	if err != nil {
-		return err
-	} else {
-		logger.Log.Info("Cache loaded")
-	}
-
-	for _, order := range tempCache {
-		cache.Set(order)
-	}
-
-	return nil
-}
-
-func startHTTPServer(cache *cache.Cache, db *sql.DB, cfg config.HTTPConfig) {
-	router := gin.Default()
-	handler := api.NewHandler(cache, db)
-
-	router.LoadHTMLGlob("web/templates/*.html")
-
-	router.GET("/", handler.IndexPage)
-
-	router.GET("/order", handler.GetOrder)
-
-	logger.Log.WithFields(logrus.Fields{
-		"port": cfg.Port,
-	}).Info("Starting HTTP server")
-
-	err := router.Run(":" + cfg.Port)
-	if err != nil {
-		logger.Log.WithFields(logrus.Fields{
-			"error": err.Error(),
-			"port":  cfg.Port,
-		}).Fatal("HTTP server failed to start")
-	}
-}
 
 func main() {
 	cfg := config.Load()
@@ -83,12 +41,13 @@ func main() {
 
 	defer db.Close()
 
-	err = loadCacheFromDB(db, cache)
+	err = cache.LoadCacheFromDB(db)
 
 	if err != nil {
 		logger.Log.Warn("error load cache from db", err)
 	}
-	go startHTTPServer(cache, db, cfg.HTTP)
+	httpServer := server.NewServer(cache, db, cfg.HTTP)
+	go httpServer.Start()
 
 	for {
 		message, err := r.ReadMessage(context.Background())
