@@ -1,24 +1,23 @@
 package server
 
 import (
-	"database/sql"
-
 	"github.com/ArtemKVD/WB-TechL0/internal/api"
 	"github.com/ArtemKVD/WB-TechL0/internal/cache"
 	"github.com/ArtemKVD/WB-TechL0/internal/config"
 	"github.com/ArtemKVD/WB-TechL0/internal/logger"
+	database "github.com/ArtemKVD/WB-TechL0/internal/storage"
 	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"
 )
 
 type Server struct {
-	router *gin.Engine
-	cache  *cache.Cache
-	db     *sql.DB
-	cfg    config.HTTPConfig
+	router  *gin.Engine
+	cache   *cache.Cache
+	storage database.OrderStorage
+	cfg     config.HTTPConfig
 }
 
-func NewServer(cache *cache.Cache, db *sql.DB, cfg config.HTTPConfig) *Server {
+func NewServer(cache *cache.Cache, db database.OrderStorage, cfg config.HTTPConfig) *Server {
 	router := gin.Default()
 	handler := api.NewHandler(cache, db)
 
@@ -27,10 +26,10 @@ func NewServer(cache *cache.Cache, db *sql.DB, cfg config.HTTPConfig) *Server {
 	router.GET("/order", handler.GetOrder)
 
 	return &Server{
-		router: router,
-		cache:  cache,
-		db:     db,
-		cfg:    cfg,
+		router:  router,
+		cache:   cache,
+		storage: db,
+		cfg:     cfg,
 	}
 }
 

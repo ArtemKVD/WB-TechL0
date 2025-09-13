@@ -11,14 +11,67 @@ import (
 	"github.com/joho/godotenv"
 )
 
-func GetConnString(cfg config.DatabaseConfig) string {
+type OrderStorage interface {
+	SaveOrder(order models.Order) error
+	GetOrder(orderUID string) (models.Order, error)
+	LoadOrdersFromDB() (map[string]models.Order, error)
+	GetConnString() string
+	Connect() error
+	Close() error
+}
+
+type Database struct {
+	db  *sql.DB
+	cfg config.DatabaseConfig
+}
+
+func NewDatabase(cfg config.DatabaseConfig) *Database {
+	return &Database{cfg: cfg}
+}
+
+func (d *Database) GetConnString() string {
+	godotenv.Load()
+	return getConnString(d.cfg)
+}
+
+func (d *Database) SaveOrder(order models.Order) error {
+	return saveOrder(d.db, order)
+}
+
+func (d *Database) GetOrder(orderUID string) (models.Order, error) {
+	return getOrderFromDB(d.db, orderUID)
+}
+
+func (d *Database) LoadOrdersFromDB() (map[string]models.Order, error) {
+	cache := make(map[string]models.Order)
+	err := loadOrdersFromDB(d.db, cache)
+	return cache, err
+}
+
+func (d *Database) Close() error {
+	if d.db != nil {
+		return d.db.Close()
+	}
+	return nil
+}
+
+func getConnString(cfg config.DatabaseConfig) string {
 	godotenv.Load()
 
 	return fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s sslmode=%s",
 		cfg.Host, cfg.Port, cfg.User, cfg.Password, cfg.Name, cfg.SSLMode)
 }
 
-func SaveOrder(db *sql.DB, order models.Order) error {
+func (d *Database) Connect() error {
+	db, err := sql.Open("postgres", d.GetConnString())
+	if err != nil {
+		return err
+	}
+	d.db = db
+	return db.Ping()
+}
+
+func saveOrder(db *sql.DB, order models.Order) error {
 	tx, err := db.Begin()
 	if err != nil {
 		logger.Log.Error("Begin transaction error ", err)
@@ -71,7 +124,7 @@ func SaveOrder(db *sql.DB, order models.Order) error {
 	return nil
 }
 
-func GetOrderFromDB(db *sql.DB, orderUID string) (models.Order, error) {
+func getOrderFromDB(db *sql.DB, orderUID string) (models.Order, error) {
 	tx, err := db.Begin()
 	if err != nil {
 		logger.Log.Error("Begin transaction error", err)
@@ -208,4 +261,129 @@ func GetOrderFromDB(db *sql.DB, orderUID string) (models.Order, error) {
 	}
 
 	return order, nil
+}
+
+func loadOrdersFromDB(db *sql.DB, cache map[string]models.Order) error {
+	limit := 5
+	tx, err := db.Begin()
+	if err != nil {
+		logger.Log.Error("begin transaction error", err)
+		return err
+	}
+	defer tx.Rollback()
+
+	query := `
+		SELECT 
+			o.order_uid, o.track_number, o.entry, o.locale, o.internal_signature,
+			o.customer_id, o.delivery_service, o.shardkey, o.sm_id, o.date_created, o.oof_shard,
+			d.name, d.phone, d.zip, d.city, d.address, d.region, d.email,
+			p.transaction, p.request_id, p.currency, p.provider, p.amount, p.payment_dt,
+			p.bank, p.delivery_cost, p.goods_total, p.custom_fee,
+			i.chrt_id, i.track_number as item_track_number, i.price, i.rid, i.name as item_name,
+			i.sale, i.size, i.total_price, i.nm_id, i.brand, i.status
+		FROM orders o
+		INNER JOIN delivery d ON o.order_uid = d.order_uid
+		INNER JOIN payment p ON o.order_uid = p.order_uid
+		LEFT JOIN items i ON o.order_uid = i.order_uid
+		WHERE o.order_uid IN (
+			SELECT order_uid 
+			FROM orders 
+			ORDER BY date_created DESC 
+			LIMIT $1
+		)
+		ORDER BY o.order_uid, i.chrt_id
+	`
+
+	rows, err := tx.Query(query, limit)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var orderUID, trackNumber, entry, locale, internalSignature, customerID, deliveryService, shardkey, oofShard, dateCreated, name, phone, zip, city, address, region, email, transaction, requestID, currency, provider, bank, itemTrackNumber, rid, itemName, size, brand string
+		var smID, amount, deliveryCost, goodsTotal, customFee, paymentDt, chrtID, price, sale, totalPrice, nmID, status int
+
+		err := rows.Scan(
+			&orderUID, &trackNumber, &entry, &locale, &internalSignature, &customerID, &deliveryService, &shardkey, &smID, &dateCreated, &oofShard,
+			&name, &phone, &zip, &city, &address, &region, &email, &transaction, &requestID, &currency, &provider, &amount, &paymentDt,
+			&bank, &deliveryCost, &goodsTotal, &customFee, &chrtID, &itemTrackNumber, &price, &rid, &itemName, &sale, &size, &totalPrice, &nmID, &brand, &status,
+		)
+		if err != nil {
+			logger.Log.Error("Error scanning row ", err)
+			return err
+		}
+		err = rows.Err()
+		if err != nil {
+			logger.Log.Error("rows iterating error")
+			return fmt.Errorf("rows iterating error")
+		}
+
+		order, exists := cache[orderUID]
+		if !exists {
+			order = models.Order{
+				OrderUID:          orderUID,
+				TrackNumber:       trackNumber,
+				Entry:             entry,
+				Locale:            locale,
+				InternalSignature: internalSignature,
+				CustomerID:        customerID,
+				DeliveryService:   deliveryService,
+				ShardKey:          shardkey,
+				SMID:              smID,
+				DateCreated:       dateCreated,
+				OOFShard:          oofShard,
+				Delivery: models.Delivery{
+					Name:    name,
+					Phone:   phone,
+					Zip:     zip,
+					City:    city,
+					Address: address,
+					Region:  region,
+					Email:   email,
+				},
+				Payment: models.Payment{
+					Transaction:  transaction,
+					RequestID:    requestID,
+					Currency:     currency,
+					Provider:     provider,
+					Bank:         bank,
+					Amount:       amount,
+					PaymentDt:    paymentDt,
+					DeliveryCost: deliveryCost,
+					GoodsTotal:   goodsTotal,
+					CustomFee:    customFee,
+				},
+				Items: []models.Item{},
+			}
+		}
+
+		{
+			item := models.Item{
+				ChrtID:      chrtID,
+				TrackNumber: itemTrackNumber,
+				Price:       price,
+				RID:         rid,
+				Name:        itemName,
+				Sale:        sale,
+				Size:        size,
+				TotalPrice:  totalPrice,
+				NmID:        nmID,
+				Brand:       brand,
+				Status:      status,
+			}
+			order.Items = append(order.Items, item)
+		}
+
+		cache[orderUID] = order
+	}
+
+	err = tx.Commit()
+	if err != nil {
+		logger.Log.Error("transaction commit error", err)
+		return err
+	}
+
+	logger.Log.Info("orders load in cache")
+	return nil
 }

@@ -1,8 +1,8 @@
 package cache
 
 import (
-	"database/sql"
 	"sync"
+	"time"
 
 	"github.com/ArtemKVD/WB-TechL0/internal/logger"
 	database "github.com/ArtemKVD/WB-TechL0/internal/storage"
@@ -10,55 +10,111 @@ import (
 )
 
 type Cache struct {
-	mu     sync.RWMutex
-	orders map[string]models.Order
+	orders      sync.Map
+	accessTimes sync.Map
+	maxSize     int
+	currentSize int
+	ttl         time.Duration
+}
+
+type CacheService interface {
+	Set(order models.Order)
+	Get(orderUID string) (models.Order, bool)
+	LoadCacheFromDB(storage database.OrderStorage) error
+	DeleteOldest()
+	Clean()
 }
 
 func NewCache() *Cache {
 	logger.Log.Info("cache initialized")
 	return &Cache{
-		orders: make(map[string]models.Order),
+		maxSize: 1000,
+		ttl:     15 * time.Minute,
 	}
 }
 
-func (cache *Cache) Set(order models.Order) {
-	cache.mu.Lock()
-	defer cache.mu.Unlock()
-	cache.orders[order.OrderUID] = order
-	logger.Log.WithField(
-		"order_uid", order.OrderUID,
-	).Info("Order cached")
-}
+func (c *Cache) Set(order models.Order) {
+	orderUID := order.OrderUID
 
-func (cache *Cache) Get(orderUID string) (models.Order, bool) {
-	cache.mu.RLock()
-	defer cache.mu.RUnlock()
-	order, exists := cache.orders[orderUID]
+	_, exists := c.orders.Load(orderUID)
 	if exists {
-		logger.Log.WithField(
-			"order_uid", order.OrderUID,
-		).Info("Order found in cache")
-	} else {
-		logger.Log.WithField(
-			"order_uid", order.OrderUID,
-		).Info("Order not found in cache")
+		c.accessTimes.Store(orderUID, time.Now())
+		logger.Log.WithField("order_uid", orderUID).Info("order updated in cache")
+		return
 	}
-	return order, exists
+	c.Clean()
+	if c.currentSize >= c.maxSize {
+		c.DeleteOldest()
+	}
+
+	c.orders.Store(orderUID, order)
+	c.accessTimes.Store(orderUID, time.Now())
+	c.currentSize++
+
+	logger.Log.WithField("order_uid", orderUID).Info("Order cached")
 }
 
-func (cache *Cache) LoadCacheFromDB(db *sql.DB) error {
-	tempCache := make(map[string]models.Order)
+func (c *Cache) DeleteOldest() {
+	var oldestKey string
+	var oldestTime time.Time
 
-	err := database.LoadOrdersFromDB(db, tempCache)
+	c.accessTimes.Range(func(key, value interface{}) bool {
+		accessTime := value.(time.Time)
+		if oldestKey == "" || accessTime.Before(oldestTime) {
+			oldestKey = key.(string)
+			oldestTime = accessTime
+		}
+		return true
+	})
+
+	if oldestKey != "" {
+		c.orders.Delete(oldestKey)
+		c.accessTimes.Delete(oldestKey)
+		c.currentSize++
+		logger.Log.WithField("order_uid", oldestKey).Info("Oldest order deleted")
+	}
+}
+
+func (c *Cache) Get(orderUID string) (models.Order, bool) {
+
+	order, exists := c.orders.Load(orderUID)
+	if !exists {
+		logger.Log.WithField("order_uid", orderUID).Info("Order not found in cache")
+		return models.Order{}, false
+	}
+	c.accessTimes.Store(orderUID, time.Now())
+	logger.Log.WithField("order_uid", orderUID).Info("Order found in cache")
+	return order.(models.Order), true
+}
+
+func (c *Cache) LoadCacheFromDB(storage database.OrderStorage) error {
+	tempCache, err := storage.LoadOrdersFromDB()
 	if err != nil {
 		return err
-	} else {
-		logger.Log.Info("Cache loaded")
 	}
 
-	for _, order := range tempCache {
-		cache.Set(order)
+	now := time.Now()
+	for orderUID, order := range tempCache {
+		c.orders.Store(orderUID, order)
+		c.accessTimes.Store(orderUID, now)
+		c.currentSize++
+		logger.Log.Info("Order loaded in cache", orderUID)
 	}
 
 	return nil
+}
+
+func (c *Cache) Clean() {
+	now := time.Now()
+	c.accessTimes.Range(func(key, value interface{}) bool {
+		lastAccess := value.(time.Time)
+		if now.Sub(lastAccess) > c.ttl {
+			orderUID := key.(string)
+			c.orders.Delete(orderUID)
+			c.accessTimes.Delete(orderUID)
+			c.currentSize--
+			logger.Log.WithField("order_uid", orderUID).Info("order removed from cache")
+		}
+		return true
+	})
 }

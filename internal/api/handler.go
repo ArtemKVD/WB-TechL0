@@ -12,15 +12,15 @@ import (
 )
 
 type Handler struct {
-	cache *cache.Cache
-	db    *sql.DB
+	cache   *cache.Cache
+	storage database.OrderStorage
 }
 
-func NewHandler(cache *cache.Cache, db *sql.DB) *Handler {
+func NewHandler(c *cache.Cache, storage database.OrderStorage) *Handler {
 	logger.Log.Info("Handler initialized")
 	return &Handler{
-		cache: cache,
-		db:    db,
+		cache:   c,
+		storage: storage,
 	}
 }
 
@@ -34,7 +34,7 @@ func (h *Handler) GetOrder(c *gin.Context) {
 	order, found := h.cache.Get(orderUID)
 	if !found {
 		var err error
-		order, err = database.GetOrderFromDB(h.db, orderUID)
+		order, err = h.storage.GetOrder(orderUID)
 		if err != nil {
 			if errors.Is(err, sql.ErrNoRows) {
 				c.JSON(http.StatusNotFound, gin.H{"error": "Order not found"})
@@ -45,6 +45,6 @@ func (h *Handler) GetOrder(c *gin.Context) {
 		}
 		h.cache.Set(order)
 	}
-	logger.Log.Info("Order request completed successfully")
+	logger.Log.Info("order request completed")
 	c.HTML(http.StatusOK, "order.html", order)
 }
