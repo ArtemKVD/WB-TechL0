@@ -30,7 +30,10 @@ func NewDatabase(cfg config.DatabaseConfig) *Database {
 }
 
 func (d *Database) GetConnString() string {
-	godotenv.Load()
+	err := godotenv.Load()
+	if err != nil {
+		logger.Log.Error("godotenv error: ", err)
+	}
 	return getConnString(d.cfg)
 }
 
@@ -56,7 +59,10 @@ func (d *Database) Close() error {
 }
 
 func getConnString(cfg config.DatabaseConfig) string {
-	godotenv.Load()
+	err := godotenv.Load()
+	if err != nil {
+		logger.Log.Error("godotenv error: ", err)
+	}
 
 	return fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s sslmode=%s",
 		cfg.Host, cfg.Port, cfg.User, cfg.Password, cfg.Name, cfg.SSLMode)
@@ -77,7 +83,12 @@ func saveOrder(db *sql.DB, order models.Order) error {
 		logger.Log.Error("Begin transaction error ", err)
 		return err
 	}
-	defer tx.Rollback()
+	defer func() {
+		err := tx.Rollback()
+		if err != nil {
+			logger.Log.Error("Rollback error: ", err)
+		}
+	}()
 
 	_, err = tx.Exec(
 		`INSERT INTO orders (order_uid, track_number, entry, locale, internal_signature, customer_id, delivery_service, shardkey, sm_id, date_created, oof_shard)
@@ -130,7 +141,12 @@ func getOrderFromDB(db *sql.DB, orderUID string) (models.Order, error) {
 		logger.Log.Error("Begin transaction error", err)
 		return models.Order{}, err
 	}
-	defer tx.Rollback()
+	defer func() {
+		err := tx.Rollback()
+		if err != nil {
+			logger.Log.Error("Rollback error: ", err)
+		}
+	}()
 
 	query := `
 		SELECT 
@@ -153,7 +169,12 @@ func getOrderFromDB(db *sql.DB, orderUID string) (models.Order, error) {
 	if err != nil {
 		return models.Order{}, err
 	}
-	defer rows.Close()
+	defer func() {
+		err := rows.Close()
+		if err != nil {
+			logger.Log.Error("Rows close error: ", err)
+		}
+	}()
 
 	var order models.Order
 	var currentOrderUID string
@@ -270,7 +291,12 @@ func loadOrdersFromDB(db *sql.DB, cache map[string]models.Order) error {
 		logger.Log.Error("begin transaction error", err)
 		return err
 	}
-	defer tx.Rollback()
+	defer func() {
+		err := tx.Rollback()
+		if err != nil {
+			logger.Log.Error("Rollback error: ", err)
+		}
+	}()
 
 	query := `
 		SELECT 
@@ -298,7 +324,12 @@ func loadOrdersFromDB(db *sql.DB, cache map[string]models.Order) error {
 	if err != nil {
 		return err
 	}
-	defer rows.Close()
+	defer func() {
+		err := rows.Close()
+		if err != nil {
+			logger.Log.Error("Rows close error: ", err)
+		}
+	}()
 
 	for rows.Next() {
 		var orderUID, trackNumber, entry, locale, internalSignature, customerID, deliveryService, shardkey, oofShard, dateCreated, name, phone, zip, city, address, region, email, transaction, requestID, currency, provider, bank, itemTrackNumber, rid, itemName, size, brand string

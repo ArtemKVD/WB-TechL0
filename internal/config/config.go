@@ -3,6 +3,7 @@ package config
 import (
 	"os"
 
+	"github.com/ArtemKVD/WB-TechL0/internal/logger"
 	"github.com/joho/godotenv"
 )
 
@@ -32,7 +33,10 @@ type KafkaConfig struct {
 }
 
 func Load() *Config {
-	godotenv.Load()
+	err := godotenv.Load()
+	if err != nil {
+		logger.Log.Error("godotenv error: ", err)
+	}
 
 	return &Config{
 		HTTP: HTTPConfig{

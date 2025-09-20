@@ -26,7 +26,12 @@ func main() {
 		Balancer: &kafka.LeastBytes{},
 	}
 
-	defer w.Close()
+	defer func() {
+		err := w.Close()
+		if err != nil {
+			logger.Log.Error("Error close kafka writer:", err)
+		}
+	}()
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()

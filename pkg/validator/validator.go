@@ -6,86 +6,72 @@ import (
 	"time"
 
 	"github.com/ArtemKVD/WB-TechL0/pkg/models"
+	"github.com/go-playground/validator/v10"
 )
 
 var (
+	validate   = validator.New()
 	emailRegex = regexp.MustCompile(`^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$`)
 	phoneRegex = regexp.MustCompile(`^\+[1-9]\d{1,14}$`)
 )
 
+func init() {
+	validate.RegisterValidation("phone", validatePhone)
+	validate.RegisterValidation("email", validateEmail)
+	validate.RegisterValidation("timestamp", validateTimestamp)
+}
+
 func ValidateOrder(order models.Order) error {
-	err := validateOrderBasic(order)
+	err := validate.Struct(order)
 	if err != nil {
-		return err
-	}
-	err = validateDelivery(order.Delivery)
-	if err != nil {
-		return err
-	}
-	err = validatePayment(order.Payment)
-	if err != nil {
-		return err
+		return fmt.Errorf("order validation failed: %v", err)
 	}
 	err = validateItems(order.Items)
 	if err != nil {
 		return err
 	}
+
 	return nil
 }
 
-func validateOrderBasic(order models.Order) error {
-	if order.OrderUID == "" {
-		return fmt.Errorf("order UID is empty")
-	}
-	if order.TrackNumber == "" {
-		return fmt.Errorf("track number empty")
-	}
-	if order.Entry == "" {
-		return fmt.Errorf("entry empty")
-	}
-	if _, err := time.Parse(time.RFC3339, order.DateCreated); err != nil {
-		return fmt.Errorf("invalid date: %v", err)
-	}
-	return nil
+func validatePhone(fl validator.FieldLevel) bool {
+	phone := fl.Field().String()
+	return phoneRegex.MatchString(phone)
 }
 
-func validateDelivery(delivery models.Delivery) error {
-	if delivery.Name == "" {
-		return fmt.Errorf("delivery name is empty")
-	}
-	if delivery.Phone != "" && !phoneRegex.MatchString(delivery.Phone) {
-		return fmt.Errorf("invalid phone")
-	}
-	if delivery.Email != "" && !emailRegex.MatchString(delivery.Email) {
-		return fmt.Errorf("invalid email")
-	}
-	return nil
+func validateEmail(fl validator.FieldLevel) bool {
+	email := fl.Field().String()
+	return emailRegex.MatchString(email)
 }
 
-func validatePayment(payment models.Payment) error {
-	if payment.Transaction == "" {
-		return fmt.Errorf("payment transaction empty")
-	}
-	if payment.Amount <= 0 {
-		return fmt.Errorf("payment amount must <= 0")
-	}
-	if payment.DeliveryCost < 0 {
-		return fmt.Errorf("delivery cost < 0")
-	}
-	return nil
+func validateTimestamp(fl validator.FieldLevel) bool {
+	timestamp := fl.Field().String()
+	_, err := time.Parse(time.RFC3339, timestamp)
+	return err == nil
 }
 
 func validateItems(items []models.Item) error {
 	if len(items) == 0 {
-		return fmt.Errorf("order must contain item")
+		return fmt.Errorf("order item is nil")
 	}
+
 	for _, item := range items {
-		if item.Name == "" {
-			return fmt.Errorf("item name empty")
-		}
-		if item.Price <= 0 {
-			return fmt.Errorf("item price <= 0")
+		if item.Price < 0 {
+			return fmt.Errorf("item price < 0")
 		}
 	}
+
 	return nil
+}
+
+func ValidateDelivery(delivery models.Delivery) error {
+	return validate.Struct(delivery)
+}
+
+func ValidatePayment(payment models.Payment) error {
+	return validate.Struct(payment)
+}
+
+func ValidateItem(item models.Item) error {
+	return validate.Struct(item)
 }

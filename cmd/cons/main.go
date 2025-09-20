@@ -36,7 +36,12 @@ func main() {
 		GroupID: groupID,
 		Topic:   topic,
 	})
-	defer r.Close()
+	defer func() {
+		err := r.Close()
+		if err != nil {
+			logger.Log.Error("Failed to close Kafka reader: ", err)
+		}
+	}()
 
 	cacheService := cache.NewCache()
 
@@ -45,7 +50,13 @@ func main() {
 	if err != nil {
 		logger.Log.Fatal("error connecting to db: ", err)
 	}
-	defer dbStorage.Close()
+
+	defer func() {
+		err := dbStorage.Close()
+		if err != nil {
+			logger.Log.Error("Failed to close dbstorage: ", err)
+		}
+	}()
 
 	err = cacheService.LoadCacheFromDB(dbStorage)
 	if err != nil {
