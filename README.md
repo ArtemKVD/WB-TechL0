@@ -4,6 +4,46 @@ ORDER SERVICE
 Получает данные о заказах из очереди Kafka, сохраняет их в базе данных и кэширует в памяти.
 Используется веб-интерфейс для поиска и отображения данных заказа по ID. 
 ---------------------------------------------------------------
+
+```mermaid
+graph LR
+    P[Producer] -->|Send order| K[Kafka]
+    K -->|Consume order| C[Consumer]
+    C -->|Save to| DB[PostgreSQL]
+    
+    Client[Client] -->|HTTP Request| C
+    C -->|Query| DB
+    DB -->|Return data| C
+    C -->|HTTP Response| Client
+```
+
+--------------------------------------------------------------
+
+```plaintext
+WB-TechL0/
+├── cmd/
+│   ├── cons/           # Consumer service
+│   └── prod/           # Producer service
+├── internal/
+│   ├── api/            # HTTP handlers
+│   ├── cache/          # Кэширование
+│   ├── config/         # Конфигурация
+│   ├── logger/         # Логирование
+│   ├── server/         # HTTP server
+│   ├── storage/        # Работа с БД
+│   └── mocks/          # Моки для тестирования
+├── pkg/
+│   ├── models/         # Модели данных
+│   ├── validator/      # Валидация
+│   └── faker/          # Генерация тестовых данных
+├── web/
+│   └── templates/      # HTML шаблоны
+├── docker-compose.yaml
+└── init.sql
+```
+
+---------------------------------------------------------------
+
 Для установки:
 ```bash
 git clone https://github.com/ArtemKVD/WB-TechL0.git
