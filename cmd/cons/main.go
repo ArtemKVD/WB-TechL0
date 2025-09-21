@@ -20,95 +20,107 @@ import (
 
 func main() {
 	logger.Init()
-
 	cfg := config.Load()
-	logger.Log.Info("Consumer starting")
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
-	topic := cfg.Kafka.Topic
-	broker := cfg.Kafka.Broker
-	groupID := cfg.Kafka.GroupID
-
-	r := kafka.NewReader(kafka.ReaderConfig{
-		Brokers: []string{broker},
-		GroupID: groupID,
-		Topic:   topic,
-	})
-	defer func() {
-		err := r.Close()
-		if err != nil {
-			logger.Log.Error("Failed to close Kafka reader: ", err)
-		}
-	}()
+	kafkaReader := Kafkainit(cfg)
+	defer closeKafka(kafkaReader)
 
 	cacheService := cache.NewCache()
+	dbStorage := Databaseinit(cfg)
+	defer closeDatabase(dbStorage)
 
+	loadCache(cacheService, dbStorage)
+	startServer(cacheService, dbStorage, cfg)
+	processMessages(ctx, kafkaReader, cacheService, dbStorage)
+}
+
+func Kafkainit(cfg *config.Config) *kafka.Reader {
+	return kafka.NewReader(kafka.ReaderConfig{
+		Brokers: []string{cfg.Kafka.Broker},
+		GroupID: cfg.Kafka.GroupID,
+		Topic:   cfg.Kafka.Topic,
+	})
+}
+
+func Databaseinit(cfg *config.Config) *database.Database {
 	dbStorage := database.NewDatabase(cfg.Database)
 	err := dbStorage.Connect()
 	if err != nil {
-		logger.Log.Fatal("error connecting to db: ", err)
+		logger.Log.Fatal("Error connecting to DB: ", err)
 	}
+	return dbStorage
+}
 
-	defer func() {
-		err := dbStorage.Close()
-		if err != nil {
-			logger.Log.Error("Failed to close dbstorage: ", err)
-		}
-	}()
-
-	err = cacheService.LoadCacheFromDB(dbStorage)
+func closeKafka(reader *kafka.Reader) {
+	err := reader.Close()
 	if err != nil {
-		logger.Log.Warn("error load cache from db: ", err)
+		logger.Log.Error("Close Kafka reader error: ", err)
 	}
+}
 
+func closeDatabase(dbStorage *database.Database) {
+	err := dbStorage.Close()
+	if err != nil {
+		logger.Log.Error("Close DB error: ", err)
+	}
+}
+
+func loadCache(cacheService *cache.Cache, dbStorage *database.Database) {
+	err := cacheService.LoadCacheFromDB(dbStorage)
+	if err != nil {
+		logger.Log.Error("Error loading cache: ", err)
+	}
+}
+
+func startServer(cacheService *cache.Cache, dbStorage *database.Database, cfg *config.Config) {
 	httpServer := server.NewServer(cacheService, dbStorage, cfg.HTTP)
 	go httpServer.Start()
+}
 
-	go func() {
-		<-ctx.Done()
-		logger.Log.Info("shutting down gracefully")
-
-		err := r.Close()
-		if err != nil {
-			logger.Log.Error("error closing kafka reader: ", err)
-		}
-
-		os.Exit(0)
-	}()
-
+func processMessages(ctx context.Context, kafkaReader *kafka.Reader, cacheService *cache.Cache, dbStorage *database.Database) {
 	for {
-		message, err := r.ReadMessage(ctx)
-		if err != nil {
-			if ctx.Err() != nil {
-				break
-			}
-			logger.Log.Error("Error read message from kafka: ", err)
-			continue
+		select {
+		case <-ctx.Done():
+			return
+		default:
+			processMessage(ctx, kafkaReader, cacheService, dbStorage)
 		}
-
-		var order models.Order
-		err = json.Unmarshal(message.Value, &order)
-		if err != nil {
-			logger.Log.Error("Unmarshal message error: ", err)
-			continue
-		}
-
-		err = validator.ValidateOrder(order)
-		if err != nil {
-			logger.Log.Error("Order validation failed: ", err)
-			continue
-		}
-
-		cacheService.Set(order)
-		logger.Log.Info("Order saved in cache")
-
-		err = dbStorage.SaveOrder(order)
-		if err != nil {
-			logger.Log.Error("save order error: ", err)
-			continue
-		}
-		logger.Log.Info("Order saved in database")
 	}
+}
+
+func processMessage(ctx context.Context, kafkaReader *kafka.Reader, cacheService *cache.Cache, dbStorage *database.Database) {
+	message, err := kafkaReader.ReadMessage(ctx)
+	if err != nil {
+		if ctx.Err() != nil {
+			return
+		}
+		logger.Log.Error("Error reading message: ", err)
+		return
+	}
+
+	var order models.Order
+	err = json.Unmarshal(message.Value, &order)
+	if err != nil {
+		logger.Log.Error("Error unmarshaling message: ", err)
+		return
+	}
+
+	err = validator.ValidateOrder(order)
+	if err != nil {
+		logger.Log.Error("Validation failed: ", err)
+		return
+	}
+
+	cacheService.Set(order)
+	logger.Log.Info("Order cached: ", order.OrderUID)
+
+	err = dbStorage.SaveOrder(order)
+	if err != nil {
+		logger.Log.Error("Error saving order: ", err)
+		return
+	}
+	logger.Log.Info("Order saved to DB: ", order.OrderUID)
 }

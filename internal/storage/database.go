@@ -85,7 +85,7 @@ func saveOrder(db *sql.DB, order models.Order) error {
 	}
 	defer func() {
 		err := tx.Rollback()
-		if err != nil {
+		if err != nil && !errors.Is(err, sql.ErrTxDone) {
 			logger.Log.Error("Rollback error: ", err)
 		}
 	}()
@@ -141,12 +141,6 @@ func getOrderFromDB(db *sql.DB, orderUID string) (models.Order, error) {
 		logger.Log.Error("Begin transaction error", err)
 		return models.Order{}, err
 	}
-	defer func() {
-		err := tx.Rollback()
-		if err != nil {
-			logger.Log.Error("Rollback error: ", err)
-		}
-	}()
 
 	query := `
 		SELECT 
@@ -206,6 +200,10 @@ func getOrderFromDB(db *sql.DB, orderUID string) (models.Order, error) {
 		)
 		err = rows.Err()
 		if err != nil {
+			err2 := tx.Rollback()
+			if err2 != nil {
+				logger.Log.Error("Rollback error: ", err)
+			}
 			if errors.Is(err, sql.ErrNoRows) {
 				logger.Log.Error("Order not found ", err)
 				return models.Order{}, err

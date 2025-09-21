@@ -36,7 +36,7 @@ func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
-	orders := faker.GenerateTestOrders(100)
+	orders := faker.GenerateTestOrders(10)
 
 	for _, order := range orders {
 		select {
