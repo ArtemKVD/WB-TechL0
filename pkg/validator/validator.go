@@ -2,6 +2,7 @@ package validator
 
 import (
 	"fmt"
+	"log"
 	"regexp"
 	"time"
 
@@ -16,9 +17,18 @@ var (
 )
 
 func init() {
-	validate.RegisterValidation("phone", validatePhone)
-	validate.RegisterValidation("email", validateEmail)
-	validate.RegisterValidation("timestamp", validateTimestamp)
+	err := validate.RegisterValidation("phone", validatePhone)
+	if err != nil {
+		log.Println("Error register validation phone: ", err)
+	}
+	err = validate.RegisterValidation("email", validateEmail)
+	if err != nil {
+		log.Println("Error register validation email: ", err)
+	}
+	err = validate.RegisterValidation("timestamp", validateTimestamp)
+	if err != nil {
+		log.Println("Error register validation timestamp: ", err)
+	}
 }
 
 func ValidateOrder(order models.Order) error {
