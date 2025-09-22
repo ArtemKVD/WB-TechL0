@@ -11,6 +11,9 @@ import (
 	"github.com/joho/godotenv"
 )
 
+var ErrNotFound = errors.New("order not found")
+
+//go:generate mockgen -destination=../mocks/storage_mock.go -package=mocks github.com/ArtemKVD/WB-TechL0/internal/storage OrderStorage
 type OrderStorage interface {
 	SaveOrder(order models.Order) error
 	GetOrder(orderUID string) (models.Order, error)
@@ -206,7 +209,7 @@ func getOrderFromDB(db *sql.DB, orderUID string) (models.Order, error) {
 			}
 			if errors.Is(err, sql.ErrNoRows) {
 				logger.Log.Error("Order not found ", err)
-				return models.Order{}, err
+				return models.Order{}, ErrNotFound
 			}
 			logger.Log.Error("Iterating rows error ", err)
 			return models.Order{}, err

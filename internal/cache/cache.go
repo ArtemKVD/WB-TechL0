@@ -17,6 +17,7 @@ type Cache struct {
 	ttl         time.Duration
 }
 
+//go:generate mockgen -destination=../mocks/cache_mock.go -package=mocks github.com/ArtemKVD/WB-TechL0/internal/cache CacheService
 type CacheService interface {
 	Set(order models.Order)
 	Get(orderUID string) (models.Order, bool)

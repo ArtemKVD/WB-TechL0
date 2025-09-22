@@ -1,7 +1,6 @@
 package api
 
 import (
-	"database/sql"
 	"errors"
 	"net/http"
 
@@ -12,11 +11,11 @@ import (
 )
 
 type Handler struct {
-	cache   *cache.Cache
+	cache   cache.CacheService
 	storage database.OrderStorage
 }
 
-func NewHandler(c *cache.Cache, storage database.OrderStorage) *Handler {
+func NewHandler(c cache.CacheService, storage database.OrderStorage) *Handler {
 	logger.Log.Info("Handler initialized")
 	return &Handler{
 		cache:   c,
@@ -36,7 +35,7 @@ func (h *Handler) GetOrder(c *gin.Context) {
 		var err error
 		order, err = h.storage.GetOrder(orderUID)
 		if err != nil {
-			if errors.Is(err, sql.ErrNoRows) {
+			if errors.Is(err, database.ErrNotFound) {
 				c.JSON(http.StatusNotFound, gin.H{"error": "Order not found"})
 			} else {
 				c.JSON(http.StatusInternalServerError, gin.H{"error": "Database error"})
